@@ -45,7 +45,7 @@ namespace SteamSusAcc
         public override void OnEnabled()
         {
             plugin = this;
-            db = new LiteDatabase("../Configs/SteamAPI.db");
+            db = new LiteDatabase("../.config/EXILED/Configs/SteamAPI.db");
             if (!Config.SteamDevKey.IsEmpty())
             {
                 apiKey = Config.SteamDevKey;
