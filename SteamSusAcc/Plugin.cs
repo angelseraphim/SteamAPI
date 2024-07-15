@@ -1,7 +1,6 @@
 ﻿using Exiled.Events.EventArgs.Player;
 using Log = Exiled.API.Features.Log;
 using Exiled.API.Features;
-using System.Threading.Tasks;
 using System.Net.Http;
 using System.Text;
 using System;
@@ -9,6 +8,8 @@ using LiteDB;
 using static SteamSusAcc.Data;
 using Newtonsoft.Json.Linq;
 using Newtonsoft.Json;
+using Exiled.API.Interfaces;
+using System.IO;
 
 namespace SteamSusAcc
 {
@@ -57,7 +58,7 @@ namespace SteamSusAcc
         public override void OnEnabled()
         {
             plugin = this;
-            db = new LiteDatabase("../.config/EXILED/Configs/SteamAPI.db");
+            db = new LiteDatabase($"{GetParentDirectory(2)}/SteamAPI.db");
             if (!Config.SteamDevKey.IsEmpty())
             {
                 apiKey = Config.SteamDevKey;
@@ -78,7 +79,17 @@ namespace SteamSusAcc
             db = null;
             if (!Config.SteamDevKey.IsEmpty())
             {
-                Exiled.Events.Handlers.Player.Verified += OnVerified;
+                if (typeof(IPlugin<>).Assembly.GetName().Version >= new Version(8, 9, 7))
+                {
+                    apiKey = Config.SteamDevKey;
+                    if (Config.DiscordWebHook.IsEmpty())
+                        Log.Warn("Webhook URL not found.");
+                    Exiled.Events.Handlers.Player.Verified -= OnVerified;
+                }
+                else
+                {
+                    Log.Error("Incorrect version of Exiled. Please install version 8.9.7 or higher");
+                }
             }
             else
             {
@@ -195,5 +206,18 @@ namespace SteamSusAcc
             return $"{player.Nickname} ({player.UserId}) [{player.IPAddress}]";
         }
         public void AddToData(string Id) => Extensions.InsertPlayer(Id);
+        private string GetParentDirectory(int levels)
+        {
+            string parentPath = Path.GetDirectoryName(ConfigPath);
+            for (int i = 0; i < levels; i++)
+            {
+                parentPath = Directory.GetParent(parentPath)?.FullName;
+                if (parentPath == null)
+                {
+                    throw new InvalidOperationException("Невозможно подняться выше корневой директории.");
+                }
+            }
+            return parentPath;
+        }
     }
 }   
