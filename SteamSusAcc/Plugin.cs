@@ -8,6 +8,7 @@ using System;
 using LiteDB;
 using static SteamSusAcc.Data;
 using Newtonsoft.Json.Linq;
+using Newtonsoft.Json;
 
 namespace SteamSusAcc
 {
@@ -23,23 +24,34 @@ namespace SteamSusAcc
         string apiKey;
         public LiteDatabase db { get; set; }
 
-        static async Task SendDiscordWebhook(string webhookUrl, string message)
+        public static void SendDiscordWebhook(string WebhookURL, string Text, string Title = null, string WebhookText = null, string AvatarURL = null, string ImageURL = null, int Color = 0xff0000)
         {
-            using (var httpClient = new HttpClient())
+            try
             {
-                var payload = new
+                var message = new
                 {
-                    content = message
+                    content = Text,
+                    avatar_url = AvatarURL,
+                    embeds = new[]
+    {
+                    new
+                    {
+                        color = Color,
+                        title = Title,
+                        description = WebhookText,
+                        image = new { url = ImageURL }
+                    }
+                }
                 };
 
-                var jsonPayload = Newtonsoft.Json.JsonConvert.SerializeObject(payload);
-                var httpContent = new StringContent(jsonPayload, Encoding.UTF8, "application/json");
-                var response = await httpClient.PostAsync(webhookUrl, httpContent);
+                var client = new HttpClient();
+                var json = JsonConvert.SerializeObject(message);
 
-                if (response.IsSuccessStatusCode)
-                    Log.Info("Message sent successfully!");
-                else
-                    Log.Error($"Failed to send message. Status code: {response.StatusCode}");
+                client.PostAsync(WebhookURL, new StringContent(json, Encoding.UTF8, "application/json"));
+            }
+            catch
+            {
+                Log.Error("Webhook is wrong. Please check your configuration");
             }
         }
         public override void OnEnabled()
@@ -49,6 +61,8 @@ namespace SteamSusAcc
             if (!Config.SteamDevKey.IsEmpty())
             {
                 apiKey = Config.SteamDevKey;
+                if (Config.DiscordWebHook.IsEmpty())
+                    Log.Warn("Webhook URL not found.");
                 Exiled.Events.Handlers.Player.Verified += OnVerified;
             }
             else
@@ -99,43 +113,50 @@ namespace SteamSusAcc
                     JObject json = JObject.Parse(jsonResponse);
 
                     var player = json["response"]["players"][0];
+                    int AccPrivacy = (int)player["communityvisibilitystate"];
+                    DateTime registrationDate = DateTimeOffset.FromUnixTimeSeconds((long)player["timecreated"]).DateTime;
 
-                    if ((int)player["communityvisibilitystate"] == 1 && Config.AccPrivacy)
+                    string playerBanUrl = $"http://api.steampowered.com/ISteamUser/GetPlayerBans/v1/?key={apiKey}&steamids={x}";
+                    HttpResponseMessage banResponse = await client.GetAsync(playerBanUrl);
+                    banResponse.EnsureSuccessStatusCode();
+                    string banJsonResponse = await banResponse.Content.ReadAsStringAsync();
+                    JObject banJson = JObject.Parse(banJsonResponse);
+                    int numberOfVacBans = (int)banJson["players"][0]["NumberOfVACBans"];
+                    int numberOfGameBans = (int)banJson["players"][0]["NumberOfGameBans"];
+
+                    string scpSlGameId = "700330";
+                    string gameTimeUrl = $"http://api.steampowered.com/IPlayerService/GetOwnedGames/v0001/?key={apiKey}&steamid={x}&format=json";
+                    HttpResponseMessage gameTimeResponse = await client.GetAsync(gameTimeUrl);
+                    gameTimeResponse.EnsureSuccessStatusCode();
+                    string gameTimeJsonResponse = await gameTimeResponse.Content.ReadAsStringAsync();
+                    JObject gameTimeJson = JObject.Parse(gameTimeJsonResponse);
+
+                    if (AccPrivacy == 1 && Config.AccPrivacy)
                     {
+                        SendDiscordWebhook(Config.DiscordWebHook, Config.AccPrivacyDiscord.Replace(":playerinfo:", GetPlayerInfo(ev.Player)));
                         ev.Player.Disconnect(Config.AccPrivacyKickReason);
                         return;
                     }
-                    DateTime registrationDate = DateTimeOffset.FromUnixTimeSeconds((long)player["timecreated"]).DateTime;
                     if (DateTime.Now - registrationDate < TimeSpan.FromDays(Config.MinAccAge))
                     {
+                        SendDiscordWebhook(Config.DiscordWebHook, Config.MinAccAgeDiscord.Replace(":playerinfo:", GetPlayerInfo(ev.Player)));
                         ev.Player.Disconnect(Config.MinAccAgeKickReason);
                         return;
                     }
                     if (Config.CheckBans)
                     {
-                        string playerBanUrl = $"http://api.steampowered.com/ISteamUser/GetPlayerBans/v1/?key={apiKey}&steamids={x}";
-                        HttpResponseMessage banResponse = await client.GetAsync(playerBanUrl);
-                        banResponse.EnsureSuccessStatusCode();
-                        string banJsonResponse = await banResponse.Content.ReadAsStringAsync();
-                        JObject banJson = JObject.Parse(banJsonResponse);
-                        int numberOfVacBans = (int)banJson["players"][0]["NumberOfVACBans"];
-                        int numberOfGameBans = (int)banJson["players"][0]["NumberOfGameBans"];
-
                         if (numberOfVacBans >= Config.MinVacBan || numberOfGameBans >= Config.MinGameBan || (numberOfVacBans + numberOfGameBans >= Config.MinTotalBans))
                         {
-                            ev.Player.Disconnect(Config.MinBanKickReason);
-                            return;
+                            SendDiscordWebhook(Config.DiscordWebHook, Config.CheckBansDiscord.Replace(":playerinfo:", GetPlayerInfo(ev.Player)).Replace(":vacbans:", numberOfVacBans.ToString()).Replace(":gamebans:", numberOfGameBans.ToString()));
+                            if (Config.CheckBansKick)
+                            {
+                                ev.Player.Disconnect(Config.MinBanKickReason);
+                                return;
+                            }
                         }
                     }
                     if (Config.MinHours != 0)
                     {
-                        string scpSlGameId = "700330";
-                        string gameTimeUrl = $"http://api.steampowered.com/IPlayerService/GetOwnedGames/v0001/?key={apiKey}&steamid={x}&format=json";
-                        HttpResponseMessage gameTimeResponse = await client.GetAsync(gameTimeUrl);
-                        gameTimeResponse.EnsureSuccessStatusCode();
-                        string gameTimeJsonResponse = await gameTimeResponse.Content.ReadAsStringAsync();
-                        JObject gameTimeJson = JObject.Parse(gameTimeJsonResponse);
-
                         if (gameTimeJson["response"] == null || gameTimeJson["response"]["games"] == null)
                         {
                             ev.Player.Disconnect(Config.MinHoursKickReason2);
@@ -155,6 +176,7 @@ namespace SteamSusAcc
                         }
                         if (hasScpSl && scpSlPlaytimeMinutes < (Config.MinHours * 60))
                         {
+                            SendDiscordWebhook(Config.DiscordWebHook, Config.MinHoursDiscord.Replace(":playerinfo:", GetPlayerInfo(ev.Player)));
                             ev.Player.Disconnect(Config.MinHoursKickReason);
                             return;
                         }
@@ -166,6 +188,10 @@ namespace SteamSusAcc
             {
                 Log.Error($"HTTP error: {ex.Message}");
             }
+        }
+        private string GetPlayerInfo(Player player)
+        {
+            return $"{player.Nickname} ({player.UserId}) [{player.IPAddress}]";
         }
         public void AddToData(string Id) => Extensions.InsertPlayer(Id);
     }
