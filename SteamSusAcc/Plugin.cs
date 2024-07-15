@@ -155,6 +155,7 @@ namespace SteamSusAcc
                             }
                         }
                     }
+
                     if (Config.MinHours != 0)
                     {
                         if (gameTimeJson["response"] == null || gameTimeJson["response"]["games"] == null)
