@@ -3,3 +3,4 @@ This plugin works using the Steam developer key, which you can get from https://
 
 Простой плагин, который поможет избавиться от надедливых вредителей, которые все время создают новые аккаунты. 
 Этот плагин работает с помощью Steam developer key, который вы сможете получить на сайте https://steamcommunity.com/dev/apikey. В поле с доменом, напишите "LocalHost" и нажмите на кнопку, после чего вы получите ключь и сможете вставить его в конфиг плагина.
+![image](https://github.com/user-attachments/assets/b1a45c0e-4d61-423a-ad2c-f782be8b2024)
