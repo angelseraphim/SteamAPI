@@ -100,15 +100,24 @@ namespace SteamSusAcc
 
         private async void OnVerified(VerifiedEventArgs ev)
         {
+            if (ev.Player.IsNorthwoodStaff || ev.Player.UserId.Contains("northwood"))
+            {
+                if (Config.DisconnectNorthwoods) 
+                    ev.Player.Disconnect(Config.DisconnectNorthwoodsReason);
+                return;
+            }
+            if (ev.Player.UserId.Contains("discord"))
+            {
+                if (Config.DisconnectDiscordPlayers)
+                    ev.Player.Disconnect(Config.DisconnectDiscordPlayersReason);
+                return;
+            }
+
             string x = ev.Player.UserId;
             int x1 = x.Length - 6;
             x = x.Remove(x1);
             string apiUrl = $"http://api.steampowered.com/ISteamUser/GetPlayerSummaries/v0002/?key={apiKey}&steamids={x}";
 
-            if (ev.Player.IsNorthwoodStaff || ev.Player.UserId.Contains("northwood"))
-            {
-                return;
-            }
             if (Extensions.GetPlayer(ev.Player.UserId, out PlayerInfo info))
             {
                 Log.Debug("player is in db");
