@@ -16,6 +16,9 @@ namespace SteamSusAcc
         [Description("Disconnect players with DiscordUserID@northwood ID?")]
         public bool DisconnectNorthwoods { get; set; } = false;
         public string DisconnectNorthwoodsReason { get; set; } = "<size=60>SteamAPI check</size>\n<size=30>[Anti sus acc]</size>\nCould not find your SteamID";
+        [Description("Disconnect a player if Steam verification fails??")]
+        public bool FailDisconnect { get; set; } = false;
+        public string FailDisconnectReason { get; set; } = "<size=60>SteamAPI check</size>\n<size=30>[Anti sus acc]</size>\nHttp request error. Error: :error:";
 
         [Description("Check how many hours a player has been playing SCP:SL (In hours. Change to 0 to disable")]
         public int MinHours { get; set; } = 0;

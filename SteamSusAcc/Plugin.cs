@@ -208,6 +208,8 @@ namespace SteamSusAcc
             catch (HttpRequestException ex)
             {
                 Log.Error($"HTTP error: {ex.Message}");
+                if (Config.FailDisconnect)
+                    ev.Player.Disconnect(Config.FailDisconnectReason.Replace(":error:", ex.Message));
             }
         }
         private string GetPlayerInfo(Player player)
