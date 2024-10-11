@@ -15,7 +15,7 @@ namespace SteamSusAcc
         public override string Prefix => "SteamAPI";
         public override string Name => "SteamAPI";
         public override string Author => "angelseraphim.";
-        public override Version Version => new Version(1, 5, 0);
+        public override Version Version => new Version(1, 5, 3);
 
         public static Plugin plugin;
         public static Webhook webhook;
