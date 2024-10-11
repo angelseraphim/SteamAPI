@@ -2,13 +2,10 @@
 using Log = Exiled.API.Features.Log;
 using Exiled.API.Features;
 using System.Net.Http;
-using System.Text;
 using System;
 using LiteDB;
 using static SteamSusAcc.Data;
 using Newtonsoft.Json.Linq;
-using Newtonsoft.Json;
-using Exiled.API.Interfaces;
 using System.IO;
 
 namespace SteamSusAcc
@@ -18,46 +15,18 @@ namespace SteamSusAcc
         public override string Prefix => "SteamAPI";
         public override string Name => "SteamAPI";
         public override string Author => "angelseraphim.";
-        public override Version Version => new Version(1, 4);
-        public override Version RequiredExiledVersion => new Version(9, 0, 0);
+        public override Version Version => new Version(1, 5, 0);
 
         public static Plugin plugin;
-        string apiKey;
+        public static Webhook webhook;
         public LiteDatabase db { get; set; }
 
-        public static void SendDiscordWebhook(string WebhookURL, string Text, string Title = null, string WebhookText = null, string AvatarURL = null, string ImageURL = null, int Color = 0xff0000)
-        {
-            try
-            {
-                var message = new
-                {
-                    content = Text,
-                    avatar_url = AvatarURL,
-                    embeds = new[]
-    {
-                    new
-                    {
-                        color = Color,
-                        title = Title,
-                        description = WebhookText,
-                        image = new { url = ImageURL }
-                    }
-                }
-                };
+        private string apiKey;
 
-                var client = new HttpClient();
-                var json = JsonConvert.SerializeObject(message);
-
-                client.PostAsync(WebhookURL, new StringContent(json, Encoding.UTF8, "application/json"));
-            }
-            catch
-            {
-                Log.Error("Webhook is wrong. Please check your configuration");
-            }
-        }
         public override void OnEnabled()
         {
             plugin = this;
+            webhook = new Webhook();
             db = new LiteDatabase($"{GetParentDirectory(2)}/SteamAPI.db");
             if (!Config.SteamDevKey.IsEmpty())
             {
@@ -75,26 +44,10 @@ namespace SteamSusAcc
         public override void OnDisabled()
         {
             plugin = null;
+            webhook = null;
             db.Dispose();
             db = null;
-            if (!Config.SteamDevKey.IsEmpty())
-            {
-                if (typeof(IPlugin<>).Assembly.GetName().Version >= new Version(8, 9, 7))
-                {
-                    apiKey = Config.SteamDevKey;
-                    if (Config.DiscordWebHook.IsEmpty())
-                        Log.Warn("Webhook URL not found.");
-                    Exiled.Events.Handlers.Player.Verified -= OnVerified;
-                }
-                else
-                {
-                    Log.Error("Incorrect version of Exiled. Please install version 8.9.7 or higher");
-                }
-            }
-            else
-            {
-                Log.Error("Steam API key not found! https://steamcommunity.com/dev/apikey");
-            }
+            Exiled.Events.Handlers.Player.Verified -= OnVerified;
             base.OnDisabled();
         }
 
@@ -112,17 +65,17 @@ namespace SteamSusAcc
                     ev.Player.Disconnect(Config.DisconnectDiscordPlayersReason);
                 return;
             }
+            if (Extensions.GetPlayer(ev.Player.UserId, out PlayerInfo info))
+            {
+                Log.Debug("player is in db");
+                return;
+            }
 
             string x = ev.Player.UserId;
             int x1 = x.Length - 6;
             x = x.Remove(x1);
             string apiUrl = $"http://api.steampowered.com/ISteamUser/GetPlayerSummaries/v0002/?key={apiKey}&steamids={x}";
 
-            if (Extensions.GetPlayer(ev.Player.UserId, out PlayerInfo info))
-            {
-                Log.Debug("player is in db");
-                return;
-            }
             try
             {
                 using (HttpClient client = new HttpClient())
@@ -151,36 +104,34 @@ namespace SteamSusAcc
                     string gameTimeJsonResponse = await gameTimeResponse.Content.ReadAsStringAsync();
                     JObject gameTimeJson = JObject.Parse(gameTimeJsonResponse);
 
-                    if (AccPrivacy == 1 && Config.AccPrivacy)
+                    if (AccPrivacy == 1 && Config.CheckAccPrivacy)
                     {
-                        SendDiscordWebhook(Config.DiscordWebHook, Config.AccPrivacyDiscord.Replace(":playerinfo:", GetPlayerInfo(ev.Player)));
-                        ev.Player.Disconnect(Config.AccPrivacyKickReason);
+                        Config.CheckPrivacy.Apply(ev.Player, true);
                         return;
                     }
-                    if (DateTime.Now - registrationDate < TimeSpan.FromDays(Config.MinAccAge))
+                    if (DateTime.Now - registrationDate < TimeSpan.FromDays(Config.CheckAge.MinDays))
                     {
-                        SendDiscordWebhook(Config.DiscordWebHook, Config.MinAccAgeDiscord.Replace(":playerinfo:", GetPlayerInfo(ev.Player)));
-                        ev.Player.Disconnect(Config.MinAccAgeKickReason);
+                        Config.CheckAge.Apply(ev.Player, true);
                         return;
                     }
                     if (Config.CheckBans)
                     {
-                        if (numberOfVacBans >= Config.MinVacBan || numberOfGameBans >= Config.MinGameBan || (numberOfVacBans + numberOfGameBans >= Config.MinTotalBans))
+                        if (numberOfVacBans >= Config.CheckBan.MinVacBans || numberOfGameBans >= Config.CheckBan.MinGameBans || (numberOfVacBans + numberOfGameBans >= Config.CheckBan.MinTotalBans))
                         {
-                            SendDiscordWebhook(Config.DiscordWebHook, Config.CheckBansDiscord.Replace(":playerinfo:", GetPlayerInfo(ev.Player)).Replace(":vacbans:", numberOfVacBans.ToString()).Replace(":gamebans:", numberOfGameBans.ToString()));
-                            if (Config.CheckBansKick)
+                            webhook.Send(Config.DiscordWebHook, Config.CheckBan.WebhookText.Replace("%playerinfo%", GetPlayerInfo(ev.Player)).Replace("%vacbans%", numberOfVacBans.ToString()).Replace("%gamebans%", numberOfGameBans.ToString()));
+                            if (Config.CheckBan.Disconnect)
                             {
-                                ev.Player.Disconnect(Config.MinBanKickReason);
+                                Config.CheckBan.Apply(ev.Player, true);
                                 return;
                             }
                         }
                     }
 
-                    if (Config.MinHours != 0)
+                    if (Config.CheckGameTime.MinHours > 0)
                     {
                         if (gameTimeJson["response"] == null || gameTimeJson["response"]["games"] == null)
                         {
-                            ev.Player.Disconnect(Config.MinHoursKickReason2);
+                            Config.CheckGameTime.Apply(ev.Player, false);
                             return;
                         }
                         var games = gameTimeJson["response"]["games"];
@@ -195,10 +146,9 @@ namespace SteamSusAcc
                                 break;
                             }
                         }
-                        if (hasScpSl && scpSlPlaytimeMinutes < (Config.MinHours * 60))
+                        if (hasScpSl && scpSlPlaytimeMinutes < (Config.CheckGameTime.MinHours * 60))
                         {
-                            SendDiscordWebhook(Config.DiscordWebHook, Config.MinHoursDiscord.Replace(":playerinfo:", GetPlayerInfo(ev.Player)));
-                            ev.Player.Disconnect(Config.MinHoursKickReason);
+                            Config.CheckGameTime.Apply(ev.Player, true);
                             return;
                         }
                     }
@@ -209,10 +159,10 @@ namespace SteamSusAcc
             {
                 Log.Error($"HTTP error: {ex.Message}");
                 if (Config.FailDisconnect)
-                    ev.Player.Disconnect(Config.FailDisconnectReason.Replace(":error:", ex.Message));
+                    ev.Player.Disconnect(Config.FailDisconnectReason.Replace("%error%", ex.Message));
             }
         }
-        private string GetPlayerInfo(Player player)
+        public string GetPlayerInfo(Player player)
         {
             return $"{player.Nickname} ({player.UserId}) [{player.IPAddress}]";
         }

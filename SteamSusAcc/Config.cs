@@ -1,4 +1,5 @@
 ﻿using Exiled.API.Interfaces;
+using SteamSusAcc.Constructor;
 using System.ComponentModel;
 
 namespace SteamSusAcc
@@ -18,30 +19,20 @@ namespace SteamSusAcc
         public string DisconnectNorthwoodsReason { get; set; } = "<size=60>SteamAPI check</size>\n<size=30>[Anti sus acc]</size>\nCould not find your SteamID";
         [Description("Disconnect a player if Steam verification fails?")]
         public bool FailDisconnect { get; set; } = false;
-        public string FailDisconnectReason { get; set; } = "<size=60>SteamAPI check</size>\n<size=30>[Anti sus acc]</size>\nHttp request error. Error: :error:";
+        public string FailDisconnectReason { get; set; } = "<size=60>SteamAPI check</size>\n<size=30>[Anti sus acc]</size>\nHttp request error. Error: %error%";
 
-        [Description("Check how many hours a player has been playing SCP:SL (In hours. Change to 0 to disable")]
-        public int MinHours { get; set; } = 0;
-        public string MinHoursDiscord { get; set; } = ":playerinfo: was disconnected from the server due to too little time in SCP:SL ";
-        public string MinHoursKickReason { get; set; } = "<size=60>SteamAPI check</size>\n<size=30>[Anti sus acc]</size>\nYou don't have enough hours to play on the server";
-        public string MinHoursKickReason2 { get; set; } = "<size=60>SteamAPI check</size>\n<size=30>[Anti sus acc]</size>\nInformation about games is hidden, please make the information public";
+        [Description("Check how many hours a player has been playing SCP:SL (In hours. Change to -1 to disable")]
+        public GameTime CheckGameTime { get; set; } = new GameTime(5, "<size=60>SteamAPI check</size>\n<size=30>[Anti sus acc]</size>\nYou don't have enough hours to play on the server", "<size=60>SteamAPI check</size>\n<size=30>[Anti sus acc]</size>\nInformation about games is hidden, please make the information public", "%playerinfo% was disconnected from the server due to too little time in SCP:SL");
 
         [Description("Check account privacy")]
-        public bool AccPrivacy { get; set; } = true;
-        public string AccPrivacyDiscord { get; set; } = ":playerinfo: was disconnected from the server due to privacy settings";
-        public string AccPrivacyKickReason { get; set; } = "<size=60>SteamAPI check</size>\n<size=30>[Anti sus acc]</size>\nYour acc too sus";
-        [Description("Check account age (In days. Set to 0 to disable)")]
-        public int MinAccAge { get; set; } = 7;
-        public string MinAccAgeDiscord { get; set; } = ":playerinfo: was disconnected from the server due to the account being too young";
-        public string MinAccAgeKickReason { get; set; } = "<size=60>SteamAPI check</size>\n<size=30>[Anti sus acc]</size>\nYour acc too young";
+        public bool CheckAccPrivacy { get; set; } = true;
+        public Privacy CheckPrivacy { get; set; } = new Privacy("<size=60>SteamAPI check</size>\n<size=30>[Anti sus acc]</size>\nYour acc too sus", "", "%playerinfo% was disconnected from the server due to privacy settings");
+
+        [Description("Check account age (In days. Set to -1 to disable)")]
+        public Age CheckAge { get; set; } = new Age(7, "<size=60>SteamAPI check</size>\n<size=30>[Anti sus acc]</size>\nYour acc too young", "", "%playerinfo% was disconnected from the server due to the account being too young");
+
         [Description("Check account bans. (VAС bans and Game bans)")]
         public bool CheckBans { get; set; } = false;
-        public bool CheckBansKick { get; set; } = true;
-        public string CheckBansDiscord { get; set; } = ":playerinfo: Player has too many bans\nVac bans count: :vacbans:\n Game bans count: :gamebans:";
-        public int MinTotalBans { get; set; } = 3;
-        public int MinVacBan { get; set; } = 2;
-        public int MinGameBan { get; set; } = 2;
-        public string MinBanKickReason { get; set; } = "<size=60>SteamAPI check</size>\n<size=30>[Anti sus acc]</size>\nYour acc have too many bans";
-
+        public Bans CheckBan { get; set; } = new Bans(false, 2, 2, 3, "<size=60>SteamAPI check</size>\n<size=30>[Anti sus acc]</size>\nYour acc have too many bans", "", "%playerinfo% Player has too many bans\nVac bans count: %vacbans%\n Game bans count: %gamebans%");
     }
 }
