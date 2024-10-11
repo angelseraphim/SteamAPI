@@ -27,7 +27,8 @@ namespace SteamSusAcc
         {
             plugin = this;
             webhook = new Webhook();
-            db = new LiteDatabase($"{GetParentDirectory(2)}/SteamAPI.db");
+            if (Config.SaveToData)
+                db = new LiteDatabase($"{GetParentDirectory(2)}/SteamAPI{Server.Port}.db");
             if (!Config.SteamDevKey.IsEmpty())
             {
                 apiKey = Config.SteamDevKey;
@@ -65,11 +66,13 @@ namespace SteamSusAcc
                     ev.Player.Disconnect(Config.DisconnectDiscordPlayersReason);
                 return;
             }
-            if (Extensions.GetPlayer(ev.Player.UserId, out PlayerInfo info))
+            Log.Debug("Checking...");
+            if (Config.SaveToData && Extensions.GetPlayer(ev.Player.UserId, out PlayerInfo info))
             {
-                Log.Debug("player is in db");
+                Log.Debug("Player is in db");
                 return;
             }
+            Log.Debug("Checking... 2");
 
             string x = ev.Player.UserId;
             int x1 = x.Length - 6;
@@ -78,8 +81,10 @@ namespace SteamSusAcc
 
             try
             {
+                Log.Debug($"Trying...");
                 using (HttpClient client = new HttpClient())
                 {
+                    Log.Debug($"Getting info");
                     HttpResponseMessage response = await client.GetAsync(apiUrl);
                     response.EnsureSuccessStatusCode();
                     string jsonResponse = await response.Content.ReadAsStringAsync();
@@ -87,35 +92,33 @@ namespace SteamSusAcc
 
                     var player = json["response"]["players"][0];
                     int AccPrivacy = (int)player["communityvisibilitystate"];
-                    DateTime registrationDate = DateTimeOffset.FromUnixTimeSeconds((long)player["timecreated"]).DateTime;
-
-                    string playerBanUrl = $"http://api.steampowered.com/ISteamUser/GetPlayerBans/v1/?key={apiKey}&steamids={x}";
-                    HttpResponseMessage banResponse = await client.GetAsync(playerBanUrl);
-                    banResponse.EnsureSuccessStatusCode();
-                    string banJsonResponse = await banResponse.Content.ReadAsStringAsync();
-                    JObject banJson = JObject.Parse(banJsonResponse);
-                    int numberOfVacBans = (int)banJson["players"][0]["NumberOfVACBans"];
-                    int numberOfGameBans = (int)banJson["players"][0]["NumberOfGameBans"];
-
-                    string scpSlGameId = "700330";
-                    string gameTimeUrl = $"http://api.steampowered.com/IPlayerService/GetOwnedGames/v0001/?key={apiKey}&steamid={x}&format=json";
-                    HttpResponseMessage gameTimeResponse = await client.GetAsync(gameTimeUrl);
-                    gameTimeResponse.EnsureSuccessStatusCode();
-                    string gameTimeJsonResponse = await gameTimeResponse.Content.ReadAsStringAsync();
-                    JObject gameTimeJson = JObject.Parse(gameTimeJsonResponse);
+                    Log.Debug($"Player acc privacy: {AccPrivacy}");
 
                     if (AccPrivacy == 1 && Config.CheckAccPrivacy)
                     {
+                        Log.Debug($"Player acc is pravate {AccPrivacy}");
                         Config.CheckPrivacy.Apply(ev.Player, true);
                         return;
                     }
+                    DateTime registrationDate = DateTimeOffset.FromUnixTimeSeconds((long)player["timecreated"]).DateTime;
+                    Log.Debug($"Getting registor date");
                     if (DateTime.Now - registrationDate < TimeSpan.FromDays(Config.CheckAge.MinDays))
                     {
                         Config.CheckAge.Apply(ev.Player, true);
+                        Log.Debug($"Player acc too young {DateTime.Now - registrationDate}");
                         return;
                     }
                     if (Config.CheckBans)
                     {
+                        string playerBanUrl = $"http://api.steampowered.com/ISteamUser/GetPlayerBans/v1/?key={apiKey}&steamids={x}";
+                        HttpResponseMessage banResponse = await client.GetAsync(playerBanUrl);
+                        banResponse.EnsureSuccessStatusCode();
+                        string banJsonResponse = await banResponse.Content.ReadAsStringAsync();
+                        JObject banJson = JObject.Parse(banJsonResponse);
+                        int numberOfVacBans = (int)banJson["players"][0]["NumberOfVACBans"];
+                        int numberOfGameBans = (int)banJson["players"][0]["NumberOfGameBans"];
+                        Log.Debug($"Getting bans count");
+
                         if (numberOfVacBans >= Config.CheckBan.MinVacBans || numberOfGameBans >= Config.CheckBan.MinGameBans || (numberOfVacBans + numberOfGameBans >= Config.CheckBan.MinTotalBans))
                         {
                             webhook.Send(Config.DiscordWebHook, Config.CheckBan.WebhookText.Replace("%playerinfo%", GetPlayerInfo(ev.Player)).Replace("%vacbans%", numberOfVacBans.ToString()).Replace("%gamebans%", numberOfGameBans.ToString()));
@@ -126,11 +129,19 @@ namespace SteamSusAcc
                             }
                         }
                     }
-
                     if (Config.CheckGameTime.MinHours > 0)
                     {
+                        string scpSlGameId = "700330";
+                        string gameTimeUrl = $"http://api.steampowered.com/IPlayerService/GetOwnedGames/v0001/?key={apiKey}&steamid={x}&format=json";
+                        HttpResponseMessage gameTimeResponse = await client.GetAsync(gameTimeUrl);
+                        gameTimeResponse.EnsureSuccessStatusCode();
+                        string gameTimeJsonResponse = await gameTimeResponse.Content.ReadAsStringAsync();
+                        JObject gameTimeJson = JObject.Parse(gameTimeJsonResponse);
+                        Log.Debug($"Getting games info");
+
                         if (gameTimeJson["response"] == null || gameTimeJson["response"]["games"] == null)
                         {
+                            Log.Debug($"Player acc is pravate {AccPrivacy}");
                             Config.CheckGameTime.Apply(ev.Player, false);
                             return;
                         }
@@ -148,6 +159,7 @@ namespace SteamSusAcc
                         }
                         if (hasScpSl && scpSlPlaytimeMinutes < (Config.CheckGameTime.MinHours * 60))
                         {
+                            Log.Debug($"Player acc The player has too few hours in SCP:SL {scpSlPlaytimeMinutes}");
                             Config.CheckGameTime.Apply(ev.Player, true);
                             return;
                         }
@@ -166,7 +178,11 @@ namespace SteamSusAcc
         {
             return $"{player.Nickname} ({player.UserId}) [{player.IPAddress}]";
         }
-        public void AddToData(string Id) => Extensions.InsertPlayer(Id);
+        public void AddToData(string Id)
+        {
+            if (Config.SaveToData)
+                Extensions.InsertPlayer(Id);
+        }
         private string GetParentDirectory(int levels)
         {
             string parentPath = Path.GetDirectoryName(ConfigPath);

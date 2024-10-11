@@ -1,4 +1,5 @@
-﻿using LiteDB;
+﻿using Exiled.API.Features;
+using LiteDB;
 using System;
 using static SteamSusAcc.Data;
 
@@ -16,7 +17,7 @@ namespace SteamSusAcc
 
     public static class Extensions
     {
-        public static ILiteCollection<PlayerInfo> PlayerInfoCollection => Plugin.plugin.db.GetCollection<PlayerInfo>("SteamAPI");
+        public static ILiteCollection<PlayerInfo> PlayerInfoCollection => Plugin.plugin.db.GetCollection<PlayerInfo>($"SteamAPI{Server.Port}");
 
         public static void InsertPlayer(string UserId)
         {
