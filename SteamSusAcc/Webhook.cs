@@ -19,15 +19,15 @@ namespace SteamSusAcc
                     content = Text,
                     avatar_url = AvatarURL,
                     embeds = new[]
-    {
-                    new
                     {
-                        color = Color,
-                        title = Title,
-                        description = WebhookText,
-                        image = new { url = ImageURL }
+                        new
+                        {
+                            color = Color,
+                            title = Title,
+                            description = WebhookText,
+                            image = new { url = ImageURL }
+                        }
                     }
-                }
                 };
 
                 var client = new HttpClient();

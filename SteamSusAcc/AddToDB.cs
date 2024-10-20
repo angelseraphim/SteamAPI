@@ -1,6 +1,7 @@
 ﻿using System;
 using CommandSystem;
-using static SteamSusAcc.Data;
+using static SteamSusAcc.DataBase.Data;
+using Extensions = SteamSusAcc.DataBase.Extensions;
 
 namespace SteamSusAcc
 {
@@ -12,8 +13,6 @@ namespace SteamSusAcc
         public string[] Aliases { get; } = { };
 
         public string Description { get; } = "Add or remove a player from the database";
-        public bool SanitizeResponse => true;
-
         public bool Execute(ArraySegment<string> arguments, ICommandSender sender, out string response)
         {
             if (arguments.Count != 2)

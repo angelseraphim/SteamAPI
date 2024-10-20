@@ -1,20 +1,9 @@
 ﻿using Exiled.API.Features;
 using LiteDB;
-using System;
-using static SteamSusAcc.Data;
+using static SteamSusAcc.DataBase.Data;
 
-namespace SteamSusAcc
+namespace SteamSusAcc.DataBase
 {
-    public class Data
-    {
-        [Serializable]
-        public class PlayerInfo
-        {
-            [BsonId]
-            public string userId { get; set; }
-        }
-    }
-
     public static class Extensions
     {
         public static ILiteCollection<PlayerInfo> PlayerInfoCollection => Plugin.plugin.db.GetCollection<PlayerInfo>($"SteamAPI{Server.Port}");
