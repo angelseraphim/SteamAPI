@@ -31,7 +31,10 @@
     <WarningLevel>4</WarningLevel>
   </PropertyGroup>
   <ItemGroup>
-    <Compile Include="AddToDB.cs" />
+    <Compile Include="Commands\Add.cs" />
+    <Compile Include="Commands\Info.cs" />
+    <Compile Include="Commands\Remove.cs" />
+    <Compile Include="Commands\SteamAPICommad.cs" />
     <Compile Include="Config.cs" />
     <Compile Include="Constructor\Age.cs" />
     <Compile Include="Constructor\Bans.cs" />
@@ -125,9 +128,6 @@
       <SpecificVersion>False</SpecificVersion>
       <HintPath>..\..\..\..\Desktop\Exiled8Dll\UnityEngine.PhysicsModule.dll</HintPath>
     </Reference>
-  </ItemGroup>
-  <ItemGroup>
-    <WCFMetadata Include="Connected Services\" />
   </ItemGroup>
   <ItemGroup>
     <None Include="packages.config" />

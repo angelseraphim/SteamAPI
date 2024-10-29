@@ -1,5 +1,6 @@
 ﻿using LiteDB;
 using System;
+using System.Collections.Generic;
 
 namespace SteamSusAcc.DataBase
 {
@@ -9,7 +10,9 @@ namespace SteamSusAcc.DataBase
         public class PlayerInfo
         {
             [BsonId]
-            public string userId { get; set; }
+            public string UserId { get; set; }
+            public List<string> Nicknames { get; set; }
+            public List<string> IPs { get; set; }
         }
     }
 }

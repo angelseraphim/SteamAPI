@@ -1,15 +1,19 @@
-﻿using Exiled.Events.EventArgs.Player;
-using Log = Exiled.API.Features.Log;
-using Exiled.API.Features;
-using System.Net.Http;
+﻿using System.Net.Http;
 using System;
-using LiteDB;
-using static SteamSusAcc.DataBase.Data;
-using Extensions = SteamSusAcc.DataBase.Extensions;
-using Newtonsoft.Json.Linq;
 using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
+
+using Exiled.Events.EventArgs.Player;
+using Exiled.API.Features;
+
+using Log = Exiled.API.Features.Log;
+using Extensions = SteamSusAcc.DataBase.Extensions;
+
+using LiteDB;
+using Newtonsoft.Json.Linq;
+
+using static SteamSusAcc.DataBase.Data;
 
 namespace SteamSusAcc
 {
@@ -18,11 +22,11 @@ namespace SteamSusAcc
         public override string Prefix => "SteamAPI";
         public override string Name => "SteamAPI";
         public override string Author => "angelseraphim.";
-        public override Version Version => new Version(1, 5, 3);
+        public override Version Version => new Version(1, 6, 0);
 
         public static Plugin plugin;
         public static Webhook webhook;
-        public LiteDatabase db { get; set; }
+        public static LiteDatabase database;
 
         private string apiKey;
 
@@ -31,7 +35,7 @@ namespace SteamSusAcc
             plugin = this;
             webhook = new Webhook();
             if (Config.SaveToData)
-                db = new LiteDatabase($"{GetParentDirectory(2)}/SteamAPI{Server.Port}.db");
+                database = new LiteDatabase($"{GetParentDirectory(2)}/SteamAPI{Server.Port}.db");
             apiKey = Config.SteamDevKey;
             Exiled.Events.Handlers.Player.Verified += OnVerified;
             base.OnEnabled();
@@ -40,8 +44,8 @@ namespace SteamSusAcc
         {
             plugin = null;
             webhook = null;
-            db.Dispose();
-            db = null;
+            database.Dispose();
+            database = null;
             Exiled.Events.Handlers.Player.Verified -= OnVerified;
             base.OnDisabled();
         }
@@ -59,8 +63,9 @@ namespace SteamSusAcc
 
             Log.Debug("Checking...");
 
-            if (Config.SaveToData && Extensions.GetPlayer(ev.Player.UserId, out PlayerInfo info))
+            if (Config.SaveToData && Extensions.TryGetValue(ev.Player.UserId, out PlayerInfo info))
             {
+                UpdateInfo(ev.Player);
                 Log.Debug("Player is in DB");
                 return;
             }
@@ -86,7 +91,7 @@ namespace SteamSusAcc
                 if (await HandleGameTime(ev, steamId)) 
                     return;
 
-                AddToData(ev.Player.UserId);
+                AddToData(ev.Player);
             }
             catch (HttpRequestException ex)
             {
@@ -241,11 +246,7 @@ namespace SteamSusAcc
         {
             return $"{player.Nickname} ({player.UserId}) [{player.IPAddress}]";
         }
-        public void AddToData(string Id)
-        {
-            if (Config.SaveToData)
-                Extensions.InsertPlayer(Id);
-        }
+
         private string GetParentDirectory(int levels)
         {
             string parentPath = Path.GetDirectoryName(ConfigPath);
@@ -258,6 +259,21 @@ namespace SteamSusAcc
                 }
             }
             return parentPath;
+        }
+
+        private void AddToData(Player player)
+        {
+            if (Config.SaveToData)
+                Extensions.InsertPlayer(player.UserId, player.Nickname, player.IPAddress);
+        }
+        private void UpdateInfo(Player player)
+        {
+            if (!Extensions.TryGetValue(player.UserId, out var info))
+                return;
+            if (!info.IPs.Contains(player.IPAddress))
+                info.IPs.Add(player.IPAddress);
+            if (!info.Nicknames.Contains(player.Nickname))
+                info.Nicknames.Add(player.Nickname);
         }
     }
 }   

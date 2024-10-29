@@ -1,23 +1,26 @@
 ﻿using Exiled.API.Features;
 using LiteDB;
+using System.Collections.Generic;
 using static SteamSusAcc.DataBase.Data;
 
 namespace SteamSusAcc.DataBase
 {
     public static class Extensions
     {
-        public static ILiteCollection<PlayerInfo> PlayerInfoCollection => Plugin.plugin.db.GetCollection<PlayerInfo>($"SteamAPI{Server.Port}");
+        public static ILiteCollection<PlayerInfo> PlayerInfoCollection => Plugin.database.GetCollection<PlayerInfo>($"SteamAPI{Server.Port}");
 
-        public static void InsertPlayer(string UserId)
+        public static void InsertPlayer(string userId, string nickname, string ip)
         {
             PlayerInfo insert = new PlayerInfo()
             {
-                userId = UserId,
+                UserId = userId,
+                Nicknames = new List<string> { nickname },
+                IPs = new List<string> { ip }
             };
             PlayerInfoCollection.Insert(insert);
         }
 
-        public static bool GetPlayer(string id, out PlayerInfo info)
+        public static bool TryGetValue(string id, out PlayerInfo info)
         {
             info = PlayerInfoCollection.FindById(id);
             return info != null;
@@ -25,7 +28,7 @@ namespace SteamSusAcc.DataBase
 
         public static void DeletePlayer(string playerId)
         {
-            if (!GetPlayer(playerId, out PlayerInfo info))
+            if (!TryGetValue(playerId, out PlayerInfo info))
                 return;
 
             PlayerInfoCollection.Delete(playerId);
